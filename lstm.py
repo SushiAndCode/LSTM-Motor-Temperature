@@ -267,36 +267,7 @@ def main():
     df3 = pd.read_csv(path_test)
     path_test = "C:/Users/leona/Documents/PMF/21-23/MS1/D/Electric/repo/Innovation23_oldML/Misano_Turno2_clean.csv"
     df4 = pd.read_csv(path_test)
-    '''    
-    z_scores = stats.zscore(df)
-
-    abs_z_scores = np.abs(z_scores)
-    filtered_entries = (abs_z_scores < 3).all(axis=1)
-    df = df[filtered_entries]
-
-    # Filter outliers   DA RIVEDERE
-    for ii in range(len(df.index)):
-        if ii > 0:
-            if df.loc[ii, 'Motor_Temperature'] == 0:
-                df.loc[ii, 'Motor_Temperature'] = df.loc[ii-1, 'Motor_Temperature']
-            elif ((df.loc[ii, 'Motor_Temperature'] - df.loc[ii-1, 'Motor_Temperature'])/df.loc[ii, 'Motor_Temperature']) > 0.1:
-                df.loc[ii, 'Motor_Temperature'] = df.loc[ii-1, 'Motor_Temperature']
-
-    #df['Motor_Temperature'] = butter_lowpass_filter(data=df['Motor_Temperature'], cutoff=)
-    df['Motor_Temperature'] = filter_movmean(df, 'Motor_Temperature', filter_window=5)
-    # Fit scalers
-    scalers = {}
-    df = pd.DataFrame(df.loc[:49000,'Motor_Temperature'])
-    df = df[1:]
-    for x in df.columns:
-        scalers[x] = MinMaxScaler().fit(df[x].values.reshape(-1, 1))
-
-    # Transform data via scalers
-    norm_df = df.copy()
-    for i, key in enumerate(scalers.keys()):
-        norm = scalers[key].transform(norm_df.iloc[:, i].values.reshape(-1, 1))
-        norm_df.iloc[:, i] = norm
-    '''
+    
     # FIltering currents
     df1 = filter_current(df1)
     df2 = filter_current(df2)

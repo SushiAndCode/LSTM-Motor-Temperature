@@ -7,41 +7,12 @@ from torch import nn
 import scipy.stats as stats
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
-import random
+from sklearn.preprocessing import StandardScaler
 import models 
+from sklearn.model_selection import train_test_split
+import os
 
 
-#Filtering function, moving average approach
-def filter_movmean(df, column, filter_window , lower_lim=1):
-    
-    # THRESHOLDS (optimized for braking)
-
-    #Filter window   
-    #The higher the length, the smoother the curve but it will neglect more data (default 5)
-    
-    #Lower lim
-    #Lower threshold, values below that are set to 0 (default 1)
-    
-    #Converts pandas data to numpy array
-    signal = df[column].to_numpy()
-    #Eliminate the noise, all the values lower than one of the size of the noise become 0
-    for ii in range(0,len(signal)-1):
-        if signal[ii] <= lower_lim:
-            signal[ii] = 0
-
-    brake_mov_av = np.convolve(signal, np.ones((filter_window)), mode='same')
-
-    brake_mov_av /= filter_window
-    return brake_mov_av
-
-#Lowpass filter
-def butter_lowpass_filter(data, cutoff, fs, order=4):
-    nyq = 0.5 * fs  # Nyquist Frequency
-    normal_cutoff = cutoff / nyq
-    # Get the filter coefficients 
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    y = filtfilt(b, a, data)
-    return y
 
 # From tensors input (x) and label class (y) for the model training 
 def prepare_input(data: torch.tensor, target_col: int, col: list, avg: tuple, col_avg: list, df: pd.DataFrame,  shuffle=True):
@@ -97,12 +68,7 @@ def prepare_input(data: torch.tensor, target_col: int, col: list, avg: tuple, co
         # Move to the next row in the output tensor row counter
         r_idx += 1
     
-    # Setting the label
-    #y = torch.tensor(df[avg[1]:][target_col].pct_change().fillna(method='bfill').values, dtype=torch.float32)
-    #y = torch.tensor(pd.DataFrame(data[avg[1]:, target_col]).pct_change().fillna(method='bfill').values)
-
-    # Shuffle if requested
-    #if shuffle:
+    
 
     # Temporary filtering 
     for ii in range(len(x[:,1])):
@@ -128,30 +94,33 @@ def prepare_input(data: torch.tensor, target_col: int, col: list, avg: tuple, co
 
     return x, y
 
-
-    
 def main():
+    
 
-    #   ----- DATA IMPORT -----
-    # File paths for the datasets Leo
-    #path_train = 'C:/Users/leona/Documents/PMF/21-23/MS1/D/Electric/repo/Innovation23_oldML/Misano4_clean_resampled20.xlsx'
-    #path_val   = 'C:/Users/leona/Documents/PMF/21-23/MS1/D/Electric/repo/Innovation23_oldML/Misano3_clean_resampled20.xlsx'
-    #path_test  = 'C:/Users/leona/Documents/PMF/21-23/MS1/D/Electric/repo/Innovation23_oldML/Misano1-1_clean_resampled20.xlsx'
+    ##### retrieve of the data #####
 
-    # File paths for the datasets Simo
-    path_train = "C:/Users/Simone/OneDrive/Documenti/Simone/Universita/Moto_polimi/Innovation/python_test_file/preprocessing_NN/Cleaned_Log_csv/Misano_Turno4.xlsx"
-    path_val = "C:/Users/Simone/OneDrive/Documenti/Simone/Universita/Moto_polimi/Innovation/python_test_file/preprocessing_NN/Cleaned_Log_csv/Misano_Turno3_1.xlsx"
-    path_test = "C:/Users/Simone/OneDrive/Documenti/Simone/Universita/Moto_polimi/Innovation/python_test_file/preprocessing_NN/Cleaned_Log_csv/Misano_Turno1.xlsx"
+    df_list = []
 
-    # Loading csv as tensors
-    train_df = pd.read_excel(path_train)#.drop(columns='Unnamed: 0')
-    val_df = pd.read_excel(path_val)#.drop(columns='Unnamed: 0')
-    test_df = pd.read_excel(path_test)#.drop(columns='Unnamed: 0')
+    # File paths for the datasets 
+    path_csv = "C:/Users/Simone/Simone/Universita/Moto_polimi/Telemetrie/2023-09-13_CREMONA"
 
-    # Downsample
-    train_df = train_df[::10] 
-    val_df = val_df[::10] 
-    test_df = test_df[::10] 
+    for file in os.listdir(path_csv):
+        if os.path.splitext(file)[1] == ".csv":
+            df = pd.read_csv(path_csv + "/" + file,on_bad_lines='skip')
+            df = df[["timestamp","Max_Voltage", "INV_MotorIqCurrent","INV_MotorIdCurrent", "INV_MotorVoltage", "INV_Speed_RPM", "INV_ActualTorqueNm"]]
+            df.fillna(inplace=True,method = "ffill")
+            df.fillna(inplace=True,method = "bfill")
+            df_list.append(df)
+
+    scaler = StandardScaler()
+    scaler.fit(df[["Max_Voltage"]])
+    df["Max_Voltage"] = scaler.transform(df[["Max_Voltage"]])
+    
+    train_df, test_df = train_test_split(df, test_size=0.1,random_state=1)
+    test_df, val_df = train_test_split(test_df, test_size=0.1,random_state=1)
+
+    ##### normalisation of the data #####
+
 
     train_tensor = torch.tensor(train_df.values)
     val_tensor = torch.tensor(val_df.values)
@@ -168,14 +137,6 @@ def main():
     # Setting device 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'\nRUNNING ON: {device}')
-
-    # Model parameters
-    hidden_size = 128
-    batch_size = 512 # Training batch size
-
-    # Set learning rate and number of epochs to train over
-    lr = 1e-4
-    n_epochs = 500
 
     # Initialize the model
     model = models.DeepLinNN(n_features=x_train.size(1), hidden_channels=hidden_size).to(device)
